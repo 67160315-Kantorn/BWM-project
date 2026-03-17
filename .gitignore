@@ -1,1 +1,2 @@
 model_artifacts/bmw_price_pipeline.pkl
+model_artifacts/*.pkl
