@@ -19,7 +19,7 @@ st.set_page_config(
 st.markdown("""
 <style>
 .block-container {
-    padding-top: 2rem;
+    padding-top: 1.5rem;
     padding-bottom: 2rem;
     max-width: 900px;
 }
@@ -30,7 +30,7 @@ st.markdown("""
 }
 .sub-title {
     color: #9ca3af;
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.2rem;
 }
 .section-card {
     background: #111827;
@@ -47,8 +47,8 @@ st.markdown("""
     margin-top: 1rem;
 }
 .small-label {
-    font-size: 0.9rem;
-    color: #9ca3af;
+    font-size: 0.95rem;
+    color: #cbd5e1;
     margin-bottom: 0.3rem;
 }
 .big-price {
@@ -62,6 +62,11 @@ st.markdown("""
     font-size: 0.9rem;
     margin-top: 2rem;
 }
+.hero-img {
+    border-radius: 18px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -69,7 +74,16 @@ st.markdown("""
 # TITLE
 # =========================
 st.markdown('<div class="main-title">🚗 BMW Used Car Price Predictor</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">Predict used BMW prices with Machine Learning</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title">ทำนายราคารถมือสอง BMW ด้วย Machine Learning</div>', unsafe_allow_html=True)
+
+# =========================
+# TOP IMAGE
+# =========================
+image_path = "assets/bmw_m4.jpg"
+if os.path.exists(image_path):
+    st.image(image_path, caption="BMW M4", use_container_width=True)
+else:
+    st.info("ยังไม่พบรูป BMW M4 กรุณาใส่ไฟล์รูปไว้ที่ assets/bmw_m4.jpg")
 
 # =========================
 # MODEL CONFIG
@@ -85,7 +99,7 @@ def load_model():
     os.makedirs("model_artifacts", exist_ok=True)
 
     if not os.path.exists(MODEL_PATH):
-        with st.spinner("Downloading model for the first time..."):
+        with st.spinner("กำลังดาวน์โหลดโมเดลครั้งแรก..."):
             gdown.download(
                 id=FILE_ID,
                 output=MODEL_PATH,
@@ -94,19 +108,19 @@ def load_model():
             )
 
     if not os.path.exists(MODEL_PATH):
-        st.error("Model file was not found after download.")
+        st.error("ไม่พบไฟล์โมเดลหลังดาวน์โหลด")
         st.stop()
 
     file_size = os.path.getsize(MODEL_PATH)
     if file_size < 1_000_000:
-        st.error("Downloaded model file looks invalid.")
+        st.error("ไฟล์โมเดลที่ดาวน์โหลดมาไม่ถูกต้อง")
         st.stop()
 
     try:
         model = joblib.load(MODEL_PATH)
         return model
     except Exception as e:
-        st.error("Failed to load model.")
+        st.error("โหลดโมเดลไม่สำเร็จ")
         st.exception(e)
         st.stop()
 
@@ -116,40 +130,40 @@ model = load_model()
 # INPUT FORM
 # =========================
 st.markdown('<div class="section-card">', unsafe_allow_html=True)
-st.subheader("🔧 Car Information")
+st.subheader("🔧 ใส่ข้อมูลรถ")
 
 col1, col2 = st.columns(2)
 
 with col1:
     model_name = st.selectbox(
-        "Model",
+        "รุ่นรถ (Model)",
         [
             "1 Series", "2 Series", "3 Series", "4 Series", "5 Series",
             "6 Series", "7 Series", "8 Series", "X1", "X2", "X3", "X4",
             "X5", "X6", "Z4", "M2", "M3", "M4", "M5", "i3", "i8"
         ],
-        index=2
+        index=18
     )
 
-    year = st.number_input("Year", min_value=1990, max_value=2025, value=2018)
-    mileage = st.number_input("Mileage (km)", min_value=0, max_value=500000, value=50000)
-    engine_size = st.number_input("Engine Size (L)", min_value=0.0, max_value=10.0, value=2.0, step=0.1)
+    year = st.number_input("ปีรถ (Year)", min_value=1990, max_value=2025, value=2018)
+    mileage = st.number_input("ระยะทาง (Mileage: km)", min_value=0, max_value=500000, value=50000)
+    engine_size = st.number_input("ขนาดเครื่องยนต์ (Engine Size: L)", min_value=0.0, max_value=10.0, value=2.0, step=0.1)
 
 with col2:
-    tax = st.number_input("Tax", min_value=0, max_value=5000, value=150)
-    mpg = st.number_input("MPG", min_value=0.0, max_value=200.0, value=50.0, step=0.1)
+    tax = st.number_input("ภาษีรถ (Tax)", min_value=0, max_value=5000, value=150)
+    mpg = st.number_input("อัตราสิ้นเปลือง (MPG)", min_value=0.0, max_value=200.0, value=50.0, step=0.1)
 
     fuel_type = st.selectbox(
-        "Fuel Type",
+        "ประเภทเชื้อเพลิง (Fuel Type)",
         ["Petrol", "Diesel", "Hybrid", "Electric", "Other"]
     )
 
     transmission = st.selectbox(
-        "Transmission",
+        "ระบบเกียร์ (Transmission)",
         ["Automatic", "Manual", "Semi-Auto", "Other"]
     )
 
-predict_btn = st.button("💰 Predict Price", use_container_width=True)
+predict_btn = st.button("💰 ทำนายราคา (Predict Price)", use_container_width=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
@@ -171,16 +185,21 @@ if predict_btn:
         prediction = model.predict(input_df)[0]
 
         st.markdown('<div class="result-card">', unsafe_allow_html=True)
-        st.markdown('<div class="small-label">Estimated Price</div>', unsafe_allow_html=True)
+        st.markdown('<div class="small-label">ราคาประเมิน (Estimated Price)</div>', unsafe_allow_html=True)
         st.markdown(f'<div class="big-price">${prediction:,.0f}</div>', unsafe_allow_html=True)
-        st.caption("Currency: USD")
+        st.caption("สกุลเงิน: USD")
         st.markdown('</div>', unsafe_allow_html=True)
 
-        with st.expander("View prediction input"):
-            st.dataframe(input_df, use_container_width=True)
+        with st.expander("ดูข้อมูลที่ใช้ในการทำนาย"):
+            show_df = input_df.copy()
+            show_df.columns = [
+                "รุ่นรถ", "ระบบเกียร์", "ประเภทเชื้อเพลิง", "ปีรถ",
+                "ระยะทาง", "ภาษี", "MPG", "ขนาดเครื่องยนต์"
+            ]
+            st.dataframe(show_df, use_container_width=True)
 
     except Exception as e:
-        st.error("Prediction failed.")
+        st.error("เกิดข้อผิดพลาดในการทำนายราคา")
         st.exception(e)
 
 # =========================
