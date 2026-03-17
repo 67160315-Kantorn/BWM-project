@@ -7,10 +7,69 @@ import streamlit as st
 # =========================
 # PAGE CONFIG
 # =========================
-st.set_page_config(page_title="BMW Price Predictor", page_icon="🚗")
+st.set_page_config(
+    page_title="BMW Price Predictor",
+    page_icon="🚗",
+    layout="centered"
+)
 
-st.title("🚗 BMW Used Car Price Predictor")
-st.write("ทำนายราคามือสองของ BMW ด้วย Machine Learning")
+# =========================
+# CUSTOM CSS
+# =========================
+st.markdown("""
+<style>
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    max-width: 900px;
+}
+.main-title {
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-bottom: 0.2rem;
+}
+.sub-title {
+    color: #9ca3af;
+    margin-bottom: 1.5rem;
+}
+.section-card {
+    background: #111827;
+    padding: 1.2rem;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.08);
+    margin-bottom: 1rem;
+}
+.result-card {
+    background: linear-gradient(135deg, #0f172a, #14532d);
+    padding: 1.2rem;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.08);
+    margin-top: 1rem;
+}
+.small-label {
+    font-size: 0.9rem;
+    color: #9ca3af;
+    margin-bottom: 0.3rem;
+}
+.big-price {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #86efac;
+}
+.footer-text {
+    text-align: center;
+    color: #9ca3af;
+    font-size: 0.9rem;
+    margin-top: 2rem;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# =========================
+# TITLE
+# =========================
+st.markdown('<div class="main-title">🚗 BMW Used Car Price Predictor</div>', unsafe_allow_html=True)
+st.markdown('<div class="sub-title">Predict used BMW prices with Machine Learning</div>', unsafe_allow_html=True)
 
 # =========================
 # MODEL CONFIG
@@ -26,88 +85,78 @@ def load_model():
     os.makedirs("model_artifacts", exist_ok=True)
 
     if not os.path.exists(MODEL_PATH):
-        st.warning("📥 กำลังดาวน์โหลดโมเดลครั้งแรก... (รอแปปนึง)")
-        gdown.download(
-            id=FILE_ID,
-            output=MODEL_PATH,
-            quiet=False,
-            fuzzy=True
-        )
+        with st.spinner("Downloading model for the first time..."):
+            gdown.download(
+                id=FILE_ID,
+                output=MODEL_PATH,
+                quiet=False,
+                fuzzy=True
+            )
 
     if not os.path.exists(MODEL_PATH):
-        st.error("ไม่พบไฟล์โมเดลหลังดาวน์โหลด")
+        st.error("Model file was not found after download.")
         st.stop()
 
     file_size = os.path.getsize(MODEL_PATH)
     if file_size < 1_000_000:
-        st.error("ไฟล์โมเดลที่ดาวน์โหลดมาเล็กผิดปกติ อาจไม่ใช่ไฟล์ .pkl จริง")
+        st.error("Downloaded model file looks invalid.")
         st.stop()
 
     try:
         model = joblib.load(MODEL_PATH)
         return model
     except Exception as e:
-        st.error("โหลดโมเดลไม่สำเร็จ")
+        st.error("Failed to load model.")
         st.exception(e)
         st.stop()
 
 model = load_model()
 
 # =========================
-# INPUT UI
+# INPUT FORM
 # =========================
-st.header("🔧 ใส่ข้อมูลรถ")
+st.markdown('<div class="section-card">', unsafe_allow_html=True)
+st.subheader("🔧 Car Information")
 
-model_name = st.selectbox(
-    "รุ่นรถ (model)",
-    [
-        "1 Series",
-        "2 Series",
-        "3 Series",
-        "4 Series",
-        "5 Series",
-        "6 Series",
-        "7 Series",
-        "8 Series",
-        "X1",
-        "X2",
-        "X3",
-        "X4",
-        "X5",
-        "X6",
-        "Z4",
-        "M2",
-        "M3",
-        "M4",
-        "M5",
-        "i3",
-        "i8"
-    ],
-    index=2
-)
+col1, col2 = st.columns(2)
 
-year = st.number_input("ปีรถ", min_value=1990, max_value=2025, value=2018)
-mileage = st.number_input("ระยะทาง (km)", min_value=0, max_value=500000, value=50000)
-tax = st.number_input("ภาษี (tax)", min_value=0, max_value=5000, value=150)
-mpg = st.number_input("อัตราสิ้นเปลือง (mpg)", min_value=0.0, max_value=200.0, value=50.0, step=0.1)
-engine_size = st.number_input("ขนาดเครื่องยนต์ (L)", min_value=0.0, max_value=10.0, value=2.0, step=0.1)
+with col1:
+    model_name = st.selectbox(
+        "Model",
+        [
+            "1 Series", "2 Series", "3 Series", "4 Series", "5 Series",
+            "6 Series", "7 Series", "8 Series", "X1", "X2", "X3", "X4",
+            "X5", "X6", "Z4", "M2", "M3", "M4", "M5", "i3", "i8"
+        ],
+        index=2
+    )
 
-fuel_type = st.selectbox(
-    "ประเภทเชื้อเพลิง",
-    ["Petrol", "Diesel", "Hybrid", "Electric", "Other"]
-)
+    year = st.number_input("Year", min_value=1990, max_value=2025, value=2018)
+    mileage = st.number_input("Mileage (km)", min_value=0, max_value=500000, value=50000)
+    engine_size = st.number_input("Engine Size (L)", min_value=0.0, max_value=10.0, value=2.0, step=0.1)
 
-transmission = st.selectbox(
-    "เกียร์",
-    ["Automatic", "Manual", "Semi-Auto", "Other"]
-)
+with col2:
+    tax = st.number_input("Tax", min_value=0, max_value=5000, value=150)
+    mpg = st.number_input("MPG", min_value=0.0, max_value=200.0, value=50.0, step=0.1)
+
+    fuel_type = st.selectbox(
+        "Fuel Type",
+        ["Petrol", "Diesel", "Hybrid", "Electric", "Other"]
+    )
+
+    transmission = st.selectbox(
+        "Transmission",
+        ["Automatic", "Manual", "Semi-Auto", "Other"]
+    )
+
+predict_btn = st.button("💰 Predict Price", use_container_width=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
 # PREDICT
 # =========================
-if st.button("💰 ทำนายราคา"):
+if predict_btn:
     try:
-        # ต้องตรงกับ feature ตอน train
         input_df = pd.DataFrame({
             "model": [model_name],
             "transmission": [transmission],
@@ -121,17 +170,20 @@ if st.button("💰 ทำนายราคา"):
 
         prediction = model.predict(input_df)[0]
 
-        st.success(f"💵 ราคาประมาณ: {prediction:,.0f}")
+        st.markdown('<div class="result-card">', unsafe_allow_html=True)
+        st.markdown('<div class="small-label">Estimated Price</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="big-price">${prediction:,.0f}</div>', unsafe_allow_html=True)
+        st.caption("Currency: USD")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-        with st.expander("ดูข้อมูลที่ใช้ทำนาย"):
-            st.dataframe(input_df)
+        with st.expander("View prediction input"):
+            st.dataframe(input_df, use_container_width=True)
 
     except Exception as e:
-        st.error("❌ เกิด error ในการทำนาย")
+        st.error("Prediction failed.")
         st.exception(e)
 
 # =========================
 # FOOTER
 # =========================
-st.markdown("---")
-st.caption("Developed with ❤️ using Streamlit")
+st.markdown('<div class="footer-text">Developed with ❤️ using Streamlit</div>', unsafe_allow_html=True)
