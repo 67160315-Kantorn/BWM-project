@@ -1,131 +1,82 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+import os
+import requests
 import joblib
-import json
 
 # =========================
-# PAGE CONFIG
+# CONFIG
 # =========================
-st.set_page_config(page_title="BMW Used Car Price Predictor", page_icon="🚗", layout="centered")
+st.set_page_config(page_title="BMW Price Predictor", page_icon="🚗")
+
+st.title("🚗 BMW Used Car Price Predictor")
+st.write("ทำนายราคามือสองของ BMW ด้วย Machine Learning")
 
 # =========================
-# LOAD MODEL + METADATA
+# MODEL CONFIG
 # =========================
 MODEL_PATH = "model_artifacts/bmw_price_pipeline.pkl"
-METADATA_PATH = "model_artifacts/model_metadata.json"
 
-model = joblib.load(MODEL_PATH)
-
-with open(METADATA_PATH, "r", encoding="utf-8") as f:
-    metadata = json.load(f)
-
-feature_order = metadata["feature_order"]
-choices = metadata["choices"]
-
-model_choices = choices["model"]
-transmission_choices = choices["transmission"]
-fuel_choices = choices["fuelType"]
+# 🔥 ใส่ลิงก์โมเดลของมึงตรงนี้
+MODEL_URL = "https://drive.google.com/uc?export=download&id=1JsP2pnQ8smLhspYD4M-y1Dx9mXeppxqU"
 
 # =========================
-# TITLE
+# DOWNLOAD MODEL IF NOT EXISTS
 # =========================
-st.title("🚗 BMW Used Car Price Predictor")
-st.write("แอปสำหรับทำนายราคารถ BMW มือสองด้วย Machine Learning")
+@st.cache_resource
+def load_model():
+    os.makedirs("model_artifacts", exist_ok=True)
 
-st.markdown("### กรอกข้อมูลรถ")
+    if not os.path.exists(MODEL_PATH):
+        st.warning("📥 กำลังดาวน์โหลดโมเดลครั้งแรก... (รอแปปนึง)")
+        r = requests.get(MODEL_URL, stream=True)
+        r.raise_for_status()
 
-# =========================
-# INPUTS
-# =========================
-col1, col2 = st.columns(2)
+        with open(MODEL_PATH, "wb") as f:
+            for chunk in r.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    f.write(chunk)
 
-with col1:
-    model_name = st.selectbox("Model", model_choices)
-    transmission = st.selectbox("Transmission", transmission_choices)
-    fuel_type = st.selectbox("Fuel Type", fuel_choices)
-    year = st.number_input("Year", min_value=1990, max_value=2025, value=2018, step=1)
+    model = joblib.load(MODEL_PATH)
+    return model
 
-with col2:
-    mileage = st.number_input("Mileage", min_value=0, max_value=500000, value=50000, step=1000)
-    tax = st.number_input("Tax", min_value=0, max_value=1000, value=150, step=10)
-    mpg = st.number_input("MPG", min_value=0.0, max_value=300.0, value=50.0, step=0.1)
-    engine_size = st.number_input("Engine Size", min_value=0.0, max_value=10.0, value=2.0, step=0.1)
+model = load_model()
 
 # =========================
-# VALIDATION
+# INPUT UI
 # =========================
-errors = []
+st.header("🔧 ใส่ข้อมูลรถ")
 
-if year < 1990 or year > 2025:
-    errors.append("Year ไม่สมเหตุสมผล")
-if mileage < 0:
-    errors.append("Mileage ต้องไม่ติดลบ")
-if tax < 0:
-    errors.append("Tax ต้องไม่ติดลบ")
-if mpg <= 0:
-    errors.append("MPG ต้องมากกว่า 0")
-if engine_size <= 0:
-    errors.append("Engine Size ต้องมากกว่า 0")
-
-for err in errors:
-    st.error(err)
+year = st.number_input("ปีรถ", min_value=1990, max_value=2025, value=2018)
+mileage = st.number_input("ระยะทาง (km)", min_value=0, max_value=500000, value=50000)
+engine_size = st.number_input("ขนาดเครื่องยนต์ (L)", min_value=1.0, max_value=5.0, value=2.0)
+fuel_type = st.selectbox("ประเภทเชื้อเพลิง", ["Petrol", "Diesel", "Hybrid", "Electric"])
+transmission = st.selectbox("เกียร์", ["Automatic", "Manual"])
 
 # =========================
-# PREDICTION
+# PREDICT
 # =========================
-if st.button("Predict Price"):
-    if errors:
-        st.warning("กรุณาแก้ข้อมูลให้ถูกต้องก่อน")
-    else:
-        input_data = {
-            "model": model_name,
-            "transmission": transmission,
-            "fuelType": fuel_type,
-            "year": year,
-            "mileage": mileage,
-            "tax": tax,
-            "mpg": mpg,
-            "engineSize": engine_size
-        }
-
-        input_df = pd.DataFrame([input_data])
-
-        # เรียงคอลัมน์ให้ตรงกับตอน train
-        input_df = input_df[feature_order]
+if st.button("💰 ทำนายราคา"):
+    try:
+        input_df = pd.DataFrame({
+            "year": [year],
+            "mileage": [mileage],
+            "engineSize": [engine_size],
+            "fuelType": [fuel_type],
+            "transmission": [transmission]
+        })
 
         prediction = model.predict(input_df)[0]
-        prediction = max(0, prediction)
 
-        # ช่วงประมาณการแบบง่าย
-        lower = max(0, prediction * 0.90)
-        upper = max(0, prediction * 1.10)
+        st.success(f"💵 ราคาประมาณ: {prediction:,.0f} บาท")
 
-        st.success(f"💰 ราคาที่คาดการณ์: £{prediction:,.2f}")
-        st.info(f"ช่วงราคาประมาณ: £{lower:,.2f} - £{upper:,.2f}")
+    except Exception as e:
+        st.error("❌ เกิด error ในการทำนาย")
+        st.exception(e)
 
 # =========================
-# MODEL INFO
+# FOOTER
 # =========================
 st.markdown("---")
-st.markdown("### 📊 Model Information")
-st.write(f"**CV MAE Mean:** {metadata['cv_mae_mean']:.2f}")
-st.write(f"**CV MAE Std:** {metadata['cv_mae_std']:.2f}")
-st.write(f"**CV R² Mean:** {metadata['cv_r2_mean']:.4f}")
-
-st.markdown("### 📘 Feature Description")
-st.write("""
-- **Model**: รุ่นของรถ BMW
-- **Transmission**: ประเภทเกียร์
-- **Fuel Type**: ประเภทเชื้อเพลิง
-- **Year**: ปีของรถ
-- **Mileage**: ระยะทางที่ใช้งานมาแล้ว
-- **Tax**: ภาษีรถ
-- **MPG**: อัตราการประหยัดน้ำมัน
-- **Engine Size**: ขนาดเครื่องยนต์
-""")
-
-st.markdown("### ⚠️ Disclaimer")
-st.write("""
-โมเดลนี้ใช้เพื่อการประมาณราคาเบื้องต้นเท่านั้น  
-ราคาจริงอาจแตกต่างตามสภาพรถ รุ่นย่อย ออปชัน และสภาพตลาดในช่วงเวลานั้น
-""")
+st.caption("Developed with ❤️ using Streamlit")
